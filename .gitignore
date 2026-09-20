@@ -1,0 +1,55 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# ── Model weights downloaded at runtime (radiologyModel.ts caches here) ──
+.model_cache/
+models/
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.ckpt
+
+# ── Training data: never commit datasets (large, and licensed) ──
+training/data/raw/
+training/data/processed/
+training/data/nih/
+training/data/chexpert/
+training/data/mimic/
+training/data/corpus/
+training/data/images/
+
+# ── Training outputs: checkpoints, logs, exports, metrics ──
+training/out/
+training/runs/
+training/checkpoints/
+training/exports/
+training/models/
+training/**/*.csv
+training/**/*.jsonl
+training/**/*.bin
+training/**/*.npy
+training/**/*.npz
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ── Local scratch ──
+tmp/
+scratch/
+*.tmp

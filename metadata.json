@@ -1,0 +1,6 @@
+{
+  "name": "MediAgent AI",
+  "description": "Multi-agent clinical decision-support triage educational prototype featuring four collaborative AI agents with grounded guideline retrieval.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,593 @@
+import { Router, Request, Response } from 'express';
+import { GoogleGenAI } from '@google/genai';
+import { runInterviewerAgent } from './agents/interviewer';
+import { generateAdaptiveFollowUps } from './agents/adaptiveInterviewer';
+import { runRadiologistAgent } from './agents/radiologist';
+import { runLabAnalystAgent } from './agents/labAnalyst';
+import { runDoctorAgent } from './agents/doctor';
+import {
+  searchClinicalGuidelines,
+  CLINICAL_GUIDELINES,
+  initializeGuidelineEmbeddings,
+} from './rag/guidelines';
+import {
+  saveCaseToFirestore,
+  getCaseFromFirestore,
+  listCasesFromFirestore,
+  deleteCaseFromFirestore,
+} from './services/firestore';
+import {
+  getRadiologySession,
+  runRadiologyModelInference,
+  MODEL_METADATA,
+} from './models/radiologyModel';
+import { extractLabReport } from './services/ocrService';
+import type {
+  ClinicalCase,
+  PatientDemographics,
+  ImagingStudy,
+  LabPanelData,
+} from '../src/types/clinical';
+
+export const apiRouter = Router();
+
+// Cold-start preload: Download and cache ONNX model from Hugging Face once
+getRadiologySession()
+  .then(() => console.log('[MediAgent Startup] DenseNet-121 ONNX model ready.'))
+  .catch((err) => console.error('[MediAgent Startup] Failed to preload ONNX model:', err));
+
+function getGenAI(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not configured');
+  }
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+}
+
+// Health & Status
+apiRouter.get('/health', async (_req: Request, res: Response) => {
+  const hasKey = !!process.env.GEMINI_API_KEY;
+  res.json({
+    status: 'online',
+    appName: 'MediAgent AI',
+    geminiConfigured: hasKey,
+    radiologyModel: MODEL_METADATA,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Standalone Direct ONNX Model Inference Endpoint
+apiRouter.post('/radiology/predict', async (req: Request, res: Response) => {
+  try {
+    const { imageDataUrl } = req.body;
+    if (!imageDataUrl) {
+      return res.status(400).json({ error: 'imageDataUrl is required for radiology inference' });
+    }
+    const inference = await runRadiologyModelInference(imageDataUrl);
+    res.json(inference);
+  } catch (err: any) {
+    console.error('Radiology model inference error:', err);
+    res.status(500).json({ error: err.message || 'Radiology model inference failed' });
+  }
+});
+
+// Guidelines listing
+apiRouter.get('/guidelines', async (_req: Request, res: Response) => {
+  res.json({
+    total: CLINICAL_GUIDELINES.length,
+    guidelines: CLINICAL_GUIDELINES,
+  });
+});
+
+// Live RAG vector search endpoint
+apiRouter.post('/rag/search', async (req: Request, res: Response) => {
+  try {
+    const { query, topK } = req.body;
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+    const ai = getGenAI();
+    const results = await searchClinicalGuidelines(ai, query, topK || 3);
+    res.json({ query, results });
+  } catch (err: any) {
+    console.error('RAG search error:', err);
+    res.status(500).json({ error: err.message || 'Failed to perform similarity search' });
+  }
+});
+
+// Lab Report OCR / Document Parsing Endpoint (PyMuPDF / Pattern Matcher)
+apiRouter.post('/ocr/extract-lab', async (req: Request, res: Response) => {
+  try {
+    const { fileData, filename } = req.body;
+    if (!fileData) {
+      return res.status(400).json({ error: 'fileData (base64 string or raw text) is required' });
+    }
+    const result = await extractLabReport(fileData, filename || 'report.pdf');
+    res.json(result);
+  } catch (err: any) {
+    console.error('OCR extraction error:', err);
+    res.status(500).json({ error: err.message || 'Failed to extract lab report' });
+  }
+});
+
+// List all stored cases from Firestore
+apiRouter.get('/cases', async (_req: Request, res: Response) => {
+  try {
+    const cases = await listCasesFromFirestore(30);
+    res.json(cases);
+  } catch (err: any) {
+    console.error('List cases error:', err);
+    res.status(500).json({ error: err.message || 'Failed to list cases' });
+  }
+});
+
+// Get single case
+apiRouter.get('/cases/:id', async (req: Request, res: Response) => {
+  try {
+    const clinicalCase = await getCaseFromFirestore(req.params.id);
+    if (!clinicalCase) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+    res.json(clinicalCase);
+  } catch (err: any) {
+    console.error('Get case error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch case' });
+  }
+});
+
+// Save or update draft case
+apiRouter.post('/cases', async (req: Request, res: Response) => {
+  try {
+    const caseData: ClinicalCase = req.body;
+    if (!caseData.id) {
+      caseData.id = `case-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+    caseData.updatedAt = new Date().toISOString();
+    if (!caseData.createdAt) {
+      caseData.createdAt = caseData.updatedAt;
+    }
+    await saveCaseToFirestore(caseData);
+    res.json(caseData);
+  } catch (err: any) {
+    console.error('Save case error:', err);
+    res.status(500).json({ error: err.message || 'Failed to save case' });
+  }
+});
+
+// Delete case
+apiRouter.delete('/cases/:id', async (req: Request, res: Response) => {
+  try {
+    await deleteCaseFromFirestore(req.params.id);
+    res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    console.error('Delete case error:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete case' });
+  }
+});
+
+// Adaptive Interviewer: Generate tailored follow-up questions based on chief complaint
+apiRouter.post('/interviewer/followup', async (req: Request, res: Response) => {
+  try {
+    const { chiefComplaint, symptomDescription, age, gender, vitals, pastMedicalHistory } = req.body;
+    let ai: GoogleGenAI | null = null;
+    try {
+      ai = getGenAI();
+    } catch {
+      // Allow fallback if API key is not configured or in testing
+    }
+    const questions = await generateAdaptiveFollowUps(ai, {
+      chiefComplaint,
+      symptomDescription,
+      age,
+      gender,
+      vitals,
+      pastMedicalHistory,
+    });
+    res.json({ questions });
+  } catch (err: any) {
+    console.error('Interviewer followup error:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate adaptive follow-up questions' });
+  }
+});
+
+// Individual Agent Testing Endpoints
+apiRouter.post('/agents/interviewer', async (req: Request, res: Response) => {
+  try {
+    const patient: PatientDemographics = req.body.patient;
+    const ai = getGenAI();
+    const result = await runInterviewerAgent(ai, patient);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Interviewer agent error:', err);
+    res.status(500).json({ error: err.message || 'Interviewer Agent failed' });
+  }
+});
+
+apiRouter.post('/agents/radiologist', async (req: Request, res: Response) => {
+  try {
+    const { imaging, clinicalContext } = req.body;
+    let ai: GoogleGenAI | null = null;
+    try {
+      ai = getGenAI();
+    } catch {
+      // Allow fallback if API key is not configured or in testing
+    }
+    const result = await runRadiologistAgent(ai, imaging, clinicalContext || 'Diagnostic triage');
+    res.json(result);
+  } catch (err: any) {
+    console.error('Radiologist agent error:', err);
+    res.status(500).json({ error: err.message || 'Radiologist Agent failed' });
+  }
+});
+
+apiRouter.post('/agents/lab-analyst', async (req: Request, res: Response) => {
+  try {
+    const { labs, clinicalContext, vitals } = req.body;
+    let ai: GoogleGenAI | null = null;
+    try {
+      ai = getGenAI();
+    } catch {
+      // Allow fallback
+    }
+    const result = await runLabAnalystAgent(ai, labs, clinicalContext || 'Diagnostic triage', vitals);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Lab analyst agent error:', err);
+    res.status(500).json({ error: err.message || 'Lab Analyst Agent failed' });
+  }
+});
+
+// REAL-TIME STREAMING PIPELINE ENDPOINT: Server-Sent Events reflecting real request execution
+apiRouter.post('/triage/stream', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  
+  // Set SSE Headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const sendEvent = (eventType: string, data: any) => {
+    res.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const {
+      caseId,
+      title,
+      patient,
+      imaging,
+      labs,
+    }: {
+      caseId?: string;
+      title?: string;
+      patient: PatientDemographics;
+      imaging?: ImagingStudy;
+      labs: LabPanelData;
+    } = req.body;
+
+    if (!patient || !patient.chiefComplaint) {
+      sendEvent('error', { error: 'Valid patient intake data with chief complaint is required' });
+      return res.end();
+    }
+
+    let ai: GoogleGenAI | null = null;
+    try {
+      ai = getGenAI();
+    } catch {
+      // Allow fallback
+    }
+    const finalCaseId = caseId || `case-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    // 1. Initialize case record in Firestore
+    const clinicalCase: ClinicalCase = {
+      id: finalCaseId,
+      title: title || `${patient.age}${patient.gender.charAt(0).toUpperCase()} - ${patient.chiefComplaint.slice(0, 45)}`,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      status: 'processing',
+      patient,
+      imaging,
+      labs,
+    };
+    await saveCaseToFirestore(clinicalCase);
+
+    sendEvent('init', {
+      caseId: finalCaseId,
+      title: clinicalCase.title,
+      status: 'processing',
+      timestamp: nowIso,
+    });
+
+    const timing = {
+      interviewerMs: 0,
+      radiologistMs: 0,
+      labAnalystMs: 0,
+      ragRetrievalMs: 0,
+      doctorMs: 0,
+      totalMs: 0,
+    };
+
+    const clinicalContext = `${patient.age}yo ${patient.gender} with ${patient.chiefComplaint}. History: ${patient.symptomDescription}. Vitals: HR ${patient.vitals.heartRate}, BP ${patient.vitals.bloodPressureSystolic}/${patient.vitals.bloodPressureDiastolic}, SpO2 ${patient.vitals.oxygenSaturation}%, Temp ${patient.vitals.temperature}C.`;
+
+    // Notify client that Interviewer, Radiologist, and Lab Analyst are now running in parallel
+    sendEvent('agent_status', {
+      agent: 'interviewer',
+      status: 'running',
+      message: 'Synthesizing patient history, chief complaint & adaptive follow-up responses...',
+      startedAt: Date.now(),
+    });
+
+    sendEvent('agent_status', {
+      agent: 'radiologist',
+      status: 'running',
+      message: 'Running DenseNet-121 ONNX neural model & generating structured radiologic findings...',
+      startedAt: Date.now(),
+    });
+
+    sendEvent('agent_status', {
+      agent: 'labAnalyst',
+      status: 'running',
+      message: 'Screening laboratory biomarkers against clinical reference thresholds & critical limits...',
+      startedAt: Date.now(),
+    });
+
+    // Run the 3 specialized agents concurrently with real individual completion callbacks
+    const interviewerPromise = (async () => {
+      const t = Date.now();
+      const res = await runInterviewerAgent(ai, patient);
+      timing.interviewerMs = Date.now() - t;
+      sendEvent('agent_status', {
+        agent: 'interviewer',
+        status: 'done',
+        executionTimeMs: timing.interviewerMs,
+        preview: res.clinicalSummary || 'Interviewer analysis complete',
+        result: res,
+      });
+      return res;
+    })();
+
+    const radiologistPromise = (async () => {
+      const t = Date.now();
+      const res = await runRadiologistAgent(ai, imaging, clinicalContext);
+      timing.radiologistMs = Date.now() - t;
+      sendEvent('agent_status', {
+        agent: 'radiologist',
+        status: 'done',
+        executionTimeMs: timing.radiologistMs,
+        preview: res.overallImpression || res.radiologicalImpression || 'Radiology evaluation complete',
+        result: res,
+      });
+      return res;
+    })();
+
+    const labAnalystPromise = (async () => {
+      const t = Date.now();
+      const res = await runLabAnalystAgent(ai, labs, clinicalContext, {
+        heartRate: patient.vitals.heartRate,
+        bloodPressureSystolic: patient.vitals.bloodPressureSystolic,
+      });
+      timing.labAnalystMs = Date.now() - t;
+      sendEvent('agent_status', {
+        agent: 'labAnalyst',
+        status: 'done',
+        executionTimeMs: timing.labAnalystMs,
+        preview: res.labImpression || 'Lab pathology assessment complete',
+        result: res,
+      });
+      return res;
+    })();
+
+    const [interviewerResult, radiologistResult, labAnalystResult] = await Promise.all([
+      interviewerPromise,
+      radiologistPromise,
+      labAnalystPromise,
+    ]);
+
+    // 5. Guideline RAG Retrieval Step
+    sendEvent('agent_status', {
+      agent: 'rag',
+      status: 'running',
+      message: 'Querying vector embeddings index for evidence-based clinical guidelines...',
+      startedAt: Date.now(),
+    });
+
+    const t3 = Date.now();
+    const ragQuery = `Patient presentation: ${patient.chiefComplaint}. Symptoms: ${patient.symptomDescription}. Abnormal vitals: HR ${patient.vitals.heartRate}, RR ${patient.vitals.respiratoryRate}, SpO2 ${patient.vitals.oxygenSaturation}%. Key Radiology: ${radiologistResult.positiveFindings?.join(', ') || 'None'}. Key Labs: ${labAnalystResult.criticalAlerts?.join(', ') || 'Standard'}.`;
+    const retrievedGuidelines = await searchClinicalGuidelines(ai, ragQuery, 4);
+    timing.ragRetrievalMs = Date.now() - t3;
+
+    sendEvent('agent_status', {
+      agent: 'rag',
+      status: 'done',
+      executionTimeMs: timing.ragRetrievalMs,
+      preview: `Retrieved ${retrievedGuidelines.length} evidence-based guideline recommendations`,
+      guidelines: retrievedGuidelines,
+    });
+
+    // 6. Doctor Agent Synthesis Step
+    sendEvent('agent_status', {
+      agent: 'doctor',
+      status: 'running',
+      message: 'Synthesizing multi-modal findings, resolving discrepancies & computing CDS triage...',
+      startedAt: Date.now(),
+    });
+
+    const t4 = Date.now();
+    const doctorResult = await runDoctorAgent(
+      ai,
+      interviewerResult,
+      radiologistResult,
+      labAnalystResult,
+      retrievedGuidelines
+    );
+    timing.doctorMs = Date.now() - t4;
+    timing.totalMs = Date.now() - startTime;
+
+    sendEvent('agent_status', {
+      agent: 'doctor',
+      status: 'done',
+      executionTimeMs: timing.doctorMs,
+      preview: `Triage: ${doctorResult.urgencyLevel.toUpperCase()} — ${doctorResult.probableConditions?.[0]?.condition || 'Evaluated'}`,
+      result: doctorResult,
+    });
+
+    // 7. Update Case in Firestore
+    clinicalCase.status = 'completed';
+    clinicalCase.updatedAt = new Date().toISOString();
+    clinicalCase.agentResults = {
+      interviewer: interviewerResult,
+      radiologist: radiologistResult,
+      labAnalyst: labAnalystResult,
+      retrievedGuidelines,
+      doctor: doctorResult,
+    };
+    clinicalCase.agentExecutionTimes = timing;
+
+    await saveCaseToFirestore(clinicalCase);
+
+    // Send complete event with full clinical case payload
+    sendEvent('complete', {
+      clinicalCase,
+      totalExecutionTimeMs: timing.totalMs,
+    });
+
+    res.end();
+  } catch (err: any) {
+    console.error('Streaming triage execution error:', err);
+    sendEvent('error', {
+      error: err.message || 'Triage streaming pipeline failed',
+    });
+    res.end();
+  }
+});
+
+// FULL PIPELINE ENDPOINT: Run Collaborative Multi-Agent Triage with RAG (Fallback POST)
+apiRouter.post('/triage/run', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  try {
+    const {
+      caseId,
+      title,
+      patient,
+      imaging,
+      labs,
+    }: {
+      caseId?: string;
+      title?: string;
+      patient: PatientDemographics;
+      imaging?: ImagingStudy;
+      labs: LabPanelData;
+    } = req.body;
+
+    if (!patient || !patient.chiefComplaint) {
+      return res.status(400).json({ error: 'Valid patient intake data with chief complaint is required' });
+    }
+
+    let ai: GoogleGenAI | null = null;
+    try {
+      ai = getGenAI();
+    } catch {
+      // Allow fallback
+    }
+    const finalCaseId = caseId || `case-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    // 1. Initialize case record in Firestore
+    const clinicalCase: ClinicalCase = {
+      id: finalCaseId,
+      title: title || `${patient.age}${patient.gender.charAt(0).toUpperCase()} - ${patient.chiefComplaint.slice(0, 45)}`,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      status: 'processing',
+      patient,
+      imaging,
+      labs,
+    };
+    await saveCaseToFirestore(clinicalCase);
+
+    const timing = {
+      interviewerMs: 0,
+      radiologistMs: 0,
+      labAnalystMs: 0,
+      ragRetrievalMs: 0,
+      doctorMs: 0,
+      totalMs: 0,
+    };
+
+    // 2, 3, 4: Run Interviewer, Radiologist, and Lab Analyst agents concurrently
+    const clinicalContext = `${patient.age}yo ${patient.gender} with ${patient.chiefComplaint}. History: ${patient.symptomDescription}. Vitals: HR ${patient.vitals.heartRate}, BP ${patient.vitals.bloodPressureSystolic}/${patient.vitals.bloodPressureDiastolic}, SpO2 ${patient.vitals.oxygenSaturation}%, Temp ${patient.vitals.temperature}C.`;
+
+    const [interviewerResult, radiologistResult, labAnalystResult] = await Promise.all([
+      (async () => {
+        const t = Date.now();
+        const res = await runInterviewerAgent(ai, patient);
+        timing.interviewerMs = Date.now() - t;
+        return res;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const res = await runRadiologistAgent(ai, imaging, clinicalContext);
+        timing.radiologistMs = Date.now() - t;
+        return res;
+      })(),
+      (async () => {
+        const t = Date.now();
+        const res = await runLabAnalystAgent(ai, labs, clinicalContext, {
+          heartRate: patient.vitals.heartRate,
+          bloodPressureSystolic: patient.vitals.bloodPressureSystolic,
+        });
+        timing.labAnalystMs = Date.now() - t;
+        return res;
+      })(),
+    ]);
+
+    // 5. Live RAG Step: Embed query combining chief complaint, symptoms, vitals, imaging & lab flags
+    const t3 = Date.now();
+    const ragQuery = `Patient presentation: ${patient.chiefComplaint}. Symptoms: ${patient.symptomDescription}. Abnormal vitals: HR ${patient.vitals.heartRate}, RR ${patient.vitals.respiratoryRate}, SpO2 ${patient.vitals.oxygenSaturation}%. Key Radiology: ${radiologistResult.positiveFindings?.join(', ') || 'None'}. Key Labs: ${labAnalystResult.criticalAlerts?.join(', ') || 'Standard'}.`;
+    const retrievedGuidelines = await searchClinicalGuidelines(ai, ragQuery, 4);
+    timing.ragRetrievalMs = Date.now() - t3;
+
+    // 6. Doctor Agent Synthesizer (grounded on all three agent results + retrieved guideline snippets)
+    const t4 = Date.now();
+    const doctorResult = await runDoctorAgent(
+      ai,
+      interviewerResult,
+      radiologistResult,
+      labAnalystResult,
+      retrievedGuidelines
+    );
+    timing.doctorMs = Date.now() - t4;
+    timing.totalMs = Date.now() - startTime;
+
+    // 7. Update Case record in Firestore with full completed results
+    clinicalCase.status = 'completed';
+    clinicalCase.updatedAt = new Date().toISOString();
+    clinicalCase.agentResults = {
+      interviewer: interviewerResult,
+      radiologist: radiologistResult,
+      labAnalyst: labAnalystResult,
+      retrievedGuidelines,
+      doctor: doctorResult,
+    };
+    clinicalCase.agentExecutionTimes = timing;
+
+    await saveCaseToFirestore(clinicalCase);
+
+    res.json(clinicalCase);
+  } catch (err: any) {
+    console.error('Triage execution error:', err);
+    res.status(500).json({
+      error: err.message || 'Triage processing failed',
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    });
+  }
+});

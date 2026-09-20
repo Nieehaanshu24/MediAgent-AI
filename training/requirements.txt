@@ -1,0 +1,59 @@
+# MediAgent AI — training dependencies
+# Python 3.10 or 3.11 recommended (3.12 has occasional wheel gaps for older pins).
+#
+#   python -m venv .venv
+#   .venv\Scripts\activate          (Windows)
+#   source .venv/bin/activate        (Linux/macOS)
+#   pip install -r training/requirements.txt
+#
+# GPU: install the CUDA build of torch matching your driver FIRST, e.g.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# then run the line below; pip will see torch already satisfied.
+
+# ── Core deep learning ─────────────────────────────────────────────
+torch>=2.2,<2.6
+torchvision>=0.17,<0.21
+numpy>=1.26,<2.2
+scipy>=1.11
+
+# ── Chest X-ray pretrained weights (Apache-2.0) ────────────────────
+# Provides DenseNet-121 weights pretrained on NIH + CheXpert + MIMIC-CXR + PadChest.
+torchxrayvision>=1.2.0
+
+# ── Hugging Face stack (retriever M2, lab NER M3, LLM M4) ──────────
+transformers>=4.40
+sentence-transformers>=2.7
+datasets>=2.19
+accelerate>=0.30
+peft>=0.11
+trl>=0.9
+
+# ── Export / serving ───────────────────────────────────────────────
+onnx>=1.16
+onnxruntime>=1.18
+optimum[onnxruntime]>=1.20
+
+# ── Evaluation & calibration (M1 metrics, M5 calibration) ──────────
+scikit-learn>=1.4
+pandas>=2.2
+matplotlib>=3.8
+seaborn>=0.13
+
+# ── Explainability: Grad-CAM for the radiologist agent ─────────────
+pytorch-grad-cam>=1.5.0
+opencv-python-headless>=4.9
+Pillow>=10.2
+
+# ── Progress / experiment tracking ────────────────────────────────
+tqdm>=4.66
+# tensorboard is optional but recommended for per-epoch per-class AUC curves
+tensorboard>=2.16
+
+# ── M3: document processing & OCR ─────────────────────────────────
+# PyMuPDF for PDF -> page images, PyMuPDF is AGPL — verify licence fit for
+# your institution; pdf2image+poppler is a permissively-licensed alternative.
+PyMuPDF>=1.24
+pytesseract>=0.3.10
+# PaddleOCR is the recommended recogniser. Installed separately because it
+# pins its own numpy/opencv versions:
+#   pip install paddlepaddle paddleocr

@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --color-background: #F8FAF8;
+  --color-surface: #FFFFFF;
+  --color-ink: #0F172A;
+  --color-primary: #0D5C3A;
+  --color-emergency: #DC2626;
+  --color-routine: #16A34A;
+  --color-muted: #64748B;
+  
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Dark Theme Palette (Obsidian Pine) */
+.dark {
+  --color-background: #09100D;
+  --color-surface: #111C17;
+  --color-ink: #F1F5F3;
+  --color-primary: #10B981;
+  --color-emergency: #EF4444;
+  --color-routine: #22C55E;
+  --color-muted: #94A3B8;
+}
+
+@theme {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-primary: var(--color-primary);
+  --color-emergency: var(--color-emergency);
+  --color-routine: var(--color-routine);
+  --color-muted: var(--color-muted);
+  
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-ink);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, footer, nav, .print\:hidden {
+    display: none !important;
+  }
+}

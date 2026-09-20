@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  # ── Express / React frontend+API ──────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - FIREBASE_SERVICE_ACCOUNT_KEY=${FIREBASE_SERVICE_ACCOUNT_KEY}
+    depends_on:
+      - python_service
+    restart: unless-stopped
+
+  # ── FastAPI Python microservice ───────────────────────────────
+  python_service:
+    build:
+      context: ./python_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount training artifacts read-only into the Python service
+      - ./training/exports:/app/training/exports:ro
+      - ./training/data/chroma_db:/app/training/data/chroma_db:ro
+      - ./training/data/corpus:/app/training/data/corpus:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes: {}

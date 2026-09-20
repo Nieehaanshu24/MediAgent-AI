@@ -1,0 +1,10 @@
+CENTRAL HOSPITAL CLINICAL LABORATORY REPORT
+Patient: John Doe (Age: 58)
+Test Results:
+White Blood Cell Count (WBC): 16.4 10^3/uL (Ref: 4.5 - 11.0) HIGH
+Neutrophil Percentage: 84 % (Ref: 40 - 70) HIGH
+C-Reactive Protein (CRP): 42 mg/L (Ref: 0.0 - 5.0) HIGH
+Serum Creatinine: 1.6 mg/dL (Ref: 0.6 - 1.2) HIGH
+Blood Urea Nitrogen (BUN): 28 mg/dL (Ref: 7 - 20) HIGH
+Serum Lactate: 3.2 mmol/L (Ref: 0.5 - 1.6) HIGH
+Potassium (K+): 4.4 mmol/L (Ref: 3.5 - 5.0) NORMAL
