@@ -7,128 +7,10 @@ import type {
   DoctorSynthesis,
   UrgencyLevel,
   EvidenceCitation,
-  ProbableCondition,
   MissingDataSource,
 } from '../../src/types/clinical';
 import { generateContentWithFallback } from '../utils/aiHelper';
 import { computeConfidencePillars, applyPillarCalibration } from './confidencePillars';
-import { calibrateConfidence } from '../services/pythonService';
-
-/**
- * Maps the live multi-agent pipeline outputs to the M5 calibrator's numeric
- * feature contract (training/exports/confidence_calibrator.joblib →
- * numeric_features). Feature names must match the trained model exactly:
- *   max_radiograph_probability, flagged_radiograph_findings, critical_lab_count,
- *   abnormal_lab_count, organ_systems_flagged, red_flag_count, deranged_vital_count,
- *   top_guideline_similarity, citation_count_{interview,radiology,lab,guideline}
- * plus the one-hot `data_completeness` (symptoms_only | partial | complete).
- */
-function extractCalibratorFeatures(input: {
-  interviewer: InterviewerAnalysis;
-  radiologist: RadiologistAnalysis;
-  labAnalyst: LabAnalystAnalysis;
-  retrievedGuidelines: ClinicalGuideline[];
-  evidenceCitations?: EvidenceCitation[];
-  dataCompletenessLevel: 'symptoms_only' | 'partial' | 'complete';
-}): Record<string, unknown> {
-  const { interviewer, radiologist, labAnalyst, retrievedGuidelines, evidenceCitations, dataCompletenessLevel } =
-    input;
-
-  const classes = radiologist?.modelInference?.classes ?? [];
-  const maxRadiographProbability = classes.length
-    ? Math.max(...classes.map((c) => c.probability ?? 0))
-    : 0;
-  const flaggedRadiographFindings = classes.filter((c) => c.flaggedPositive).length;
-
-  const markers = labAnalyst?.processedMarkers ?? [];
-  const criticalLabCount = markers.filter((m) => m.status === 'CRITICAL_HIGH' || m.status === 'CRITICAL_LOW').length;
-  const abnormalLabCount = markers.filter(
-    (m) => m.status === 'ABNORMAL_HIGH' || m.status === 'ABNORMAL_LOW'
-  ).length;
-  const organSystemsFlagged = labAnalyst?.organSystemsFlagged?.length ?? 0;
-
-  const redFlagCount = interviewer?.redFlagSymptoms?.length ?? 0;
-  const derangedVitalCount = (interviewer?.vitalsAssessment ?? []).filter(
-    (v) => v.status === 'ELEVATED' || v.status === 'HIGH' || v.status === 'LOW' || v.status === 'CRITICAL'
-  ).length;
-
-  const topGuidelineSimilarity = retrievedGuidelines?.length
-    ? Math.max(...retrievedGuidelines.map((g) => g.similarityScore ?? 0))
-    : 0;
-
-  const citationCountFor = (pillar: string) =>
-    evidenceCitations?.filter((c) => c.sourceType === pillar).length ?? 0;
-
-  return {
-    max_radiograph_probability: Number(maxRadiographProbability.toFixed(4)),
-    flagged_radiograph_findings: flaggedRadiographFindings,
-    critical_lab_count: criticalLabCount,
-    abnormal_lab_count: abnormalLabCount,
-    organ_systems_flagged: organSystemsFlagged,
-    red_flag_count: redFlagCount,
-    deranged_vital_count: derangedVitalCount,
-    top_guideline_similarity: Number(topGuidelineSimilarity.toFixed(4)),
-    citation_count_interview: citationCountFor('interview'),
-    citation_count_radiology: citationCountFor('radiology'),
-    citation_count_lab: citationCountFor('lab'),
-    citation_count_guideline: citationCountFor('guideline'),
-    data_completeness: dataCompletenessLevel,
-  };
-}
-
-/**
- * Runs the M5 confidence calibrator (/calibrator/predict) for the primary
- * condition and blends it with the deterministic pillar ceiling.
- *
- * Blending policy (never a silent override):
- *   - If the calibrator is unavailable, keep the pillar-clamped score as-is.
- *   - Otherwise blend 50/50 between the learned calibration and the
- *     evidence-ceiling score, then round. This keeps the LLM's relative
- *     judgement while grounding it in the calibrated, evidence-derived value.
- *   - The calibrator's `urgency_cross_check` is surfaced on the synthesis so a
- *     disagreement with the chosen urgency can be shown as a WARNING upstream
- *     (never silently mutates the triage level).
- */
-async function applyM5Calibration(input: {
-  condition: ProbableCondition;
-  interviewer: InterviewerAnalysis;
-  radiologist: RadiologistAnalysis;
-  labAnalyst: LabAnalystAnalysis;
-  retrievedGuidelines: ClinicalGuideline[];
-  dataCompletenessLevel: 'symptoms_only' | 'partial' | 'complete';
-}): Promise<{ condition: ProbableCondition; urgencyCrossCheck: string | null }> {
-  const { condition, interviewer, radiologist, labAnalyst, retrievedGuidelines, dataCompletenessLevel } = input;
-
-  const features = extractCalibratorFeatures({
-    interviewer,
-    radiologist,
-    labAnalyst,
-    retrievedGuidelines,
-    evidenceCitations: condition.evidenceCitations,
-    dataCompletenessLevel,
-  });
-
-  const prediction = await calibrateConfidence(features);
-  if (!prediction) {
-    return { condition, urgencyCrossCheck: null };
-  }
-
-  const calibrated = prediction.calibrated_probability; // 0-100
-  const base = condition.probabilityScore ?? 0;
-  const blended = Math.round(0.5 * base + 0.5 * calibrated);
-  const finalScore = Math.max(0, Math.min(100, blended));
-
-  return {
-    condition: {
-      ...condition,
-      probabilityScore: finalScore,
-      rationale:
-        `${condition.rationale || ''} ` +
-        `[Calibrated confidence: ${calibrated}% via M5 evidence model (blended with evidence-ceiling ${base}%).]`,
-    },
-    urgencyCrossCheck: prediction.urgency_cross_check ?? null,
-  };
-}
 
 export async function runDoctorAgent(
   ai: GoogleGenAI | null,
@@ -136,7 +18,8 @@ export async function runDoctorAgent(
   radiologist: RadiologistAnalysis,
   labAnalyst: LabAnalystAnalysis,
   retrievedGuidelines: ClinicalGuideline[]
-): Promise<DoctorSynthesis> {  const structuredFindings =
+): Promise<DoctorSynthesis> {
+  const structuredFindings =
     radiologist.findings && radiologist.findings.length > 0
       ? radiologist.findings
       : (radiologist.regionObservations || []).map((obs, idx) => ({
@@ -427,24 +310,6 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
           });
           return applyPillarCalibration(cond, pillars);
         });
-
-        // M5 calibrated confidence for the primary condition (index 0). The
-        // urgency cross-check is surfaced on the synthesis for an upstream
-        // WARNING on disagreement; it never silently mutates the triage level.
-        const m5 = await applyM5Calibration({
-          condition: parsed.probableConditions[0],
-          interviewer,
-          radiologist,
-          labAnalyst,
-          retrievedGuidelines,
-          dataCompletenessLevel,
-        });
-        parsed.probableConditions[0] = m5.condition;
-        if (m5.urgencyCrossCheck && m5.urgencyCrossCheck !== parsed.urgencyLevel) {
-          parsed.guidelineGroundingSummary =
-            `${parsed.guidelineGroundingSummary || ''} ` +
-            `[M5 urgency cross-check predicts '${m5.urgencyCrossCheck}', which differs from the assigned '${parsed.urgencyLevel}' — flagged for clinician review.]`;
-        }
       }
 
       return parsed;
@@ -453,7 +318,7 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
     }
   }
 
-  const fallback = buildFallbackDoctorSynthesis(
+  return buildFallbackDoctorSynthesis(
     interviewer,
     radiologist,
     labAnalyst,
@@ -465,26 +330,6 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
     defaultMissingSources,
     defaultLimitationsNotice
   );
-
-  // M5 calibrated confidence for the primary condition on the deterministic path.
-  if (fallback.probableConditions && fallback.probableConditions.length > 0) {
-    const m5 = await applyM5Calibration({
-      condition: fallback.probableConditions[0],
-      interviewer,
-      radiologist,
-      labAnalyst,
-      retrievedGuidelines,
-      dataCompletenessLevel,
-    });
-    fallback.probableConditions[0] = m5.condition;
-    if (m5.urgencyCrossCheck && m5.urgencyCrossCheck !== fallback.urgencyLevel) {
-      fallback.guidelineGroundingSummary =
-        `${fallback.guidelineGroundingSummary || ''} ` +
-        `[M5 urgency cross-check predicts '${m5.urgencyCrossCheck}', which differs from the assigned '${fallback.urgencyLevel}' — flagged for clinician review.]`;
-    }
-  }
-
-  return fallback;
 }
 
 function buildFallbackDoctorSynthesis(

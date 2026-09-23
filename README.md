@@ -1,7 +1,9 @@
 # MediAgent AI 🏥
+### A Multi-Agent Retrieval-Augmented Generation (RAG) System for Intelligent Medical Triage and Explainable Clinical Decision Support
 
-**VIT Final Year Project — FF No. 180 | Group 4 | AY 2026-27**  
-Guide: Dr. Bhagwan D. Thorat | Department of Computer Science, VIT
+**VIT Project Registration & Progress Review — FF No. 180 | Group 4 | AY 2026-27 | Semester 5**  
+**Department:** Artificial Intelligence and Data Science (AIDS), Vishwakarma Institute of Technology, Pune  
+**Internal Guide:** Dr. Bhagwan D. Thorat (bhagwan.thorat@vit.edu)
 
 ---
 
@@ -197,12 +199,16 @@ mediagent-ai/
 
 ---
 
-## Team
+## Team — Group No. 4 (AIDS, TY-B)
 
-| Member | Role |
-|--------|------|
-| Group 4 | Development & Research |
+| Sr. No. | Roll No. | G.R. No. | Name of Student | Email ID | Primary Module Ownership | Presentation Order |
+|:---:|:---:|:---:|---|---|---|:---:|
+| **1** | **57** | **12414454** | **Nieehaanshu Hireh** | nieehaanshu.hireh24@vit.edu | **Project Lead, Problem Scope & RAG Knowledge Retrieval (M2)** | **Lead & Intro (Min 0–2)** |
+| 2 | 38 | 12413482 | **Krissh Garsund** | krissh.garsund24@vit.edu | Multi-Agent Orchestration & Interviewer Agent (M4) | Module 2 (Min 2–4) |
+| 3 | 41 | 12410543 | **Harsh Gawas** | harsh.gawas24@vit.edu | Medical Image Processing, DenseNet-121 & Grad-CAM XAI (M1) | Module 3 (Min 4–6) |
+| 4 | 58 | 12414058 | **Faheem Inamdar** | faheem.inamdar24@vit.edu | Document OCR & Clinical Lab Named Entity Recognition (M3) | Module 4 (Min 6–8) |
+| 5 | 70 | 12415175 | **Aarya Dangre** | aarya.dangre241@vit.edu | Confidence Calibration (M5), Microservices & Cloud Architecture | Module 5 (Min 8–10) |
 
-**Guide:** Dr. Bhagwan D. Thorat  
-**Institution:** Vishwakarma Institute of Technology, Pune  
-**Academic Year:** 2026-27, Semester 5
+**Internal Guide:** Dr. Bhagwan D. Thorat  
+**Department:** Artificial Intelligence and Data Science (AIDS), Vishwakarma Institute of Technology, Pune  
+**Academic Year:** 2026-27 | **Semester:** 5 (Review 1)

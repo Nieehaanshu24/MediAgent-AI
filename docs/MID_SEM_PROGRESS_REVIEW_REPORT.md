@@ -1,22 +1,33 @@
 # MediAgent AI — Mid-Semester Progress Review Report
 
-**VIT Final Year Project — FF No. 180 | Review 1**  
-**Group 4 | Semester 5, AY 2026-27**  
-**Guide:** Dr. Bhagwan D. Thorat  
-**Department:** Computer Science & Engineering, Vishwakarma Institute of Technology, Pune
+**VIT Project Registration & Progress Review — FF No. 180 | Review 1**  
+**Department:** Artificial Intelligence and Data Science (AIDS)  
+**Academic Year:** 2026-27 | **Semester:** 05 | **Group No.:** 4  
+**Guide:** Dr. Bhagwan D. Thorat (Contact: 9881290300, bhagwan.thorat@vit.edu)  
+**Institution:** Vishwakarma Institute of Technology, Pune
 
 ---
 
-## 1. Project Identity
+## 1. Project Identity & Group Details
 
 | Field | Value |
-|-------|-------|
-| **Project Title** | MediAgent AI — Multi-Agent Clinical Decision Support System |
-| **FF Number** | 180 |
-| **Academic Year** | 2026-27 |
-| **Semester** | 5 (Mid-Semester Review 1) |
-| **Guide** | Dr. Bhagwan D. Thorat |
-| **Team** | Group 4 |
+|---|---|
+| **Project Title** | **MediAgent AI: A Multi-Agent Retrieval-Augmented Generation (RAG) System for Intelligent Medical Triage and Explainable Clinical Decision Support** |
+| **FF Form Number** | FF No. 180 (Issue 01 : Rev No. 00 : Dt. 05/02/26) |
+| **Department** | Artificial Intelligence and Data Science (AIDS) |
+| **Academic Year / Sem** | 2026-27 / Semester 05 |
+| **Group Number** | Group No. 4 |
+| **Internal Guide** | Dr. Bhagwan D. Thorat |
+
+### Group Members (Presentation Order):
+
+| Sr. No. | Class & Div | Roll No. | G.R. No. | Name of Student | Contact No. | Email ID | Project Role & Module |
+|:---:|:---:|:---:|:---:|---|:---:|---|---|
+| **1** | **TY-B** | **57** | **12414454** | **Nieehaanshu Hireh** *(Lead & Intro)* | **9175032546** | **nieehaanshu.hireh24@vit.edu** | **Project Lead, Problem Scope & Knowledge Retrieval (M2 RAG)** |
+| 2 | TY-B | 38 | 12413482 | **Krissh Garsund** | 8554042436 | krissh.garsund24@vit.edu | Multi-Agent Orchestration & Interviewer Agent (M4) |
+| 3 | TY-B | 41 | 12410543 | **Harsh Gawas** | 9823820241 | harsh.gawas24@vit.edu | Medical Image Processing, DenseNet-121 & Grad-CAM XAI (M1) |
+| 4 | TY-B | 58 | 12414058 | **Faheem Inamdar** | 9130056245 | faheem.inamdar24@vit.edu | Document OCR & Clinical Lab Named Entity Recognition (M3) |
+| 5 | TY-B | 70 | 12415175 | **Aarya Dangre** | 9689133188 | aarya.dangre241@vit.edu | Confidence Calibration (M5), Microservices & Cloud Architecture |
 
 ---
 
@@ -32,15 +43,15 @@ Clinical decision support remains largely siloed: radiology tools don't communic
 
 | Objective (from Synopsis) | Status | Evidence |
 |--------------------------|--------|---------|
-| M1: Radiology ONNX model for chest X-ray classification | ✅ Done | DenseNet-121 ONNX (29 MB) hosted on HuggingFace, loaded via `onnxruntime-node`; 5-class pathology output |
-| M1: Grad-CAM XAI overlay | ✅ Done | Native PyTorch hooks on DenseNet-121; `public/xai/gradcam_overlay.png` generated |
-| M2: RAG knowledge retrieval | ✅ Done | SentenceTransformer (S-PubMedBert-MS-MARCO) fine-tuned; ChromaDB with 10 guideline chunks |
-| M2: Retriever baseline evaluation | ✅ Done | Recall@1=0.667, MRR@10=0.774, NDCG@10=0.827 |
-| M3: Lab report OCR extraction | ✅ Done | PyMuPDF; 19-analyte pattern matcher; tested on sample reports |
-| M3: Lab NER synthetic data | ✅ Done | 200 synthetic lab reports in `training/data/raw/lab_ner_synthetic.jsonl` |
-| M4: Adaptive patient interviewer | ✅ Done | Gemini LLM structured intake with deterministic fallback |
-| M5: Confidence calibration | ✅ Done | 4-pillar LogisticRegression + CalibratedClassifierCV; Macro F1=1.0 on synthetic data |
-| M5: Urgency classification | ✅ Done | Separate urgency cross-check classifier trained alongside calibrator |
+| M1: Radiology ONNX model for chest X-ray classification | ✅ Done | DenseNet-121 ONNX (27.0 MB) trained on Kaggle GPU with 10,000 NIH ChestX-ray14 images across 14 pathologies; Mean AUC = 0.782 |
+| M1: Grad-CAM XAI overlay | ✅ Done | Native PyTorch hooks on DenseNet-121; `public/xai/gradcam_overlay.png` generated & served in UI |
+| M2: RAG knowledge retrieval | ✅ Done | SentenceTransformer (S-PubMedBert) fine-tuned (Round 1 + Round 2 Hard Negatives); ChromaDB with 10 guideline chunks |
+| M2: Retriever baseline evaluation | ✅ Done | Recall@1=0.667, Recall@10=1.000, MRR@10=0.774, NDCG@10=0.827 |
+| M3: Lab report OCR extraction | ✅ Done | PyMuPDF engine + 19-analyte pattern matcher; integrated into frontend OCR dropzone card |
+| M3: Lab NER model training | ✅ Done | Custom SpaCy transition-based NER model trained for 25 epochs on 200 lab reports; exported to `training/exports/spacy_lab_ner/` |
+| M4: Adaptive patient interviewer | ✅ Done | Gemini LLM structured intake with deterministic clinical rule fallback |
+| M5: Confidence calibration | ✅ Done | 4-pillar Platt Scaling (`CalibratedClassifierCV`) on 1,200 clinical cases; ECE reduced to 0.0121, Brier 0.1537 |
+| M5: Urgency classification | ✅ Done | Random Forest urgency classifier trained alongside calibrator (Macro F1 = 0.9926) |
 | FastAPI microservice for AI APIs | ✅ Done | `python_service/app.py`; endpoints: `/rag/search`, `/ocr/extract-lab`, `/calibrator/predict` |
 | Firebase Firestore integration | ✅ Done | Patient cases persisted; hardened security rules (auth-gated) |
 | Frontend multi-step diagnostic UI | ✅ Done | React + Vite + TailwindCSS; 4-step workflow with live agent streaming |

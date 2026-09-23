@@ -23,10 +23,8 @@ services:
   # ── FastAPI Python microservice ───────────────────────────────
   python_service:
     build:
-      # Build from the repo root so the Dockerfile can COPY both
-      # python_service/ and the training/ package it imports at runtime.
-      context: .
-      dockerfile: python_service/Dockerfile
+      context: ./python_service
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:

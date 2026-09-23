@@ -453,7 +453,7 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
     }
   }
 
-  const fallback = buildFallbackDoctorSynthesis(
+  return buildFallbackDoctorSynthesis(
     interviewer,
     radiologist,
     labAnalyst,
@@ -465,26 +465,6 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
     defaultMissingSources,
     defaultLimitationsNotice
   );
-
-  // M5 calibrated confidence for the primary condition on the deterministic path.
-  if (fallback.probableConditions && fallback.probableConditions.length > 0) {
-    const m5 = await applyM5Calibration({
-      condition: fallback.probableConditions[0],
-      interviewer,
-      radiologist,
-      labAnalyst,
-      retrievedGuidelines,
-      dataCompletenessLevel,
-    });
-    fallback.probableConditions[0] = m5.condition;
-    if (m5.urgencyCrossCheck && m5.urgencyCrossCheck !== fallback.urgencyLevel) {
-      fallback.guidelineGroundingSummary =
-        `${fallback.guidelineGroundingSummary || ''} ` +
-        `[M5 urgency cross-check predicts '${m5.urgencyCrossCheck}', which differs from the assigned '${fallback.urgencyLevel}' — flagged for clinician review.]`;
-    }
-  }
-
-  return fallback;
 }
 
 function buildFallbackDoctorSynthesis(

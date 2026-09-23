@@ -1,7 +1,7 @@
 # MediAgent AI — Complete End-to-End System Documentation
 
 **Project Title:** MediAgent AI — Multi-Agent Clinical Decision Support System  
-**Academic Record:** VIT Final Year Project — FF No. 180 | Group 4 | AY 2026–27 | Semester 5  
+**Academic Record:** VIT Third Year Project — FF No. 180 | Group 4 | AY 2026–27 | Semester 5  
 **Faculty Guide:** Dr. Bhagwan D. Thorat | Department of Computer Science & Engineering, VIT Pune  
 **Status:** Mid-Semester Review Ready (100% Implemented & Empirically Verified)
 

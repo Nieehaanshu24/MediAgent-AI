@@ -22,9 +22,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev --prefer-offline
 
-# Copy compiled frontend, bundled server, and static assets
+# Copy compiled frontend and server source
 COPY --from=frontend-builder /app/dist ./dist
-COPY --from=frontend-builder /app/server-dist ./server-dist
+COPY --from=frontend-builder /app/server ./server
 COPY --from=frontend-builder /app/public ./public
 
 # Runtime environment
@@ -33,4 +33,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["node", "server-dist/index.js"]
+CMD ["node", "server/index.js"]

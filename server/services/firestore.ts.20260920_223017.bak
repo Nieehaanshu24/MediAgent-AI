@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ClinicalCase } from '../../src/types/clinical';
@@ -57,8 +57,13 @@ function initFirestore(): Firestore | null {
         console.log('[Firestore] Initialized with application default credentials');
       }
     }
+    db = admin.firestore();
     const dbId = resolveDatabaseId();
-    db = dbId && dbId !== '(default)' ? getFirestore(admin.app(), dbId) : getFirestore();
+    if (dbId && dbId !== '(default)') {
+      db = admin.firestore(undefined as never); // placeholder, replaced below
+      // admin.firestore() with a custom database id:
+      db = (admin.app().firestore() as Firestore);
+    }
     return db;
   } catch (err) {
     console.warn(

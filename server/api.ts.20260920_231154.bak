@@ -44,7 +44,7 @@ export const apiRouter = Router();
  * `similarityScore` is attached when available.
  */
 async function retrieveGuidelines(
-  ai: GoogleGenAI | null,
+  ai: GoogleGenAI,
   queryText: string,
   topK = 3
 ): Promise<ClinicalGuideline[]> {
@@ -63,12 +63,7 @@ async function retrieveGuidelines(
   }
 
   // 2) Fallback: in-memory Gemini embedding search over hardcoded guidelines.
-  //    Requires a configured Gemini client; if unavailable, return an empty set
-  //    rather than throwing so a missing key never breaks retrieval.
-  if (ai) {
-    return searchClinicalGuidelines(ai, queryText, topK);
-  }
-  return [];
+  return searchClinicalGuidelines(ai, queryText, topK);
 }
 
 // Cold-start preload: Download and cache ONNX model from Hugging Face once
@@ -133,13 +128,7 @@ apiRouter.post('/rag/search', async (req: Request, res: Response) => {
     if (!query) {
       return res.status(400).json({ error: 'Search query is required' });
     }
-    // ChromaDB retrieval needs no Gemini key; only the in-memory fallback does.
-    let ai: GoogleGenAI | null = null;
-    try {
-      ai = getGenAI();
-    } catch {
-      ai = null;
-    }
+    const ai = getGenAI();
     const results = await retrieveGuidelines(ai, query, topK || 3);
     res.json({ query, results });
   } catch (err: any) {

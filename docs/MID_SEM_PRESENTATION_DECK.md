@@ -11,16 +11,23 @@ Guide: Dr. Bhagwan D. Thorat
 ## Slide 1 — Title Slide
 
 **Headline:** MediAgent AI  
-**Subtitle:** Multi-Agent Clinical Decision Support System
+**Subtitle:** A Multi-Agent Retrieval-Augmented Generation (RAG) System for Intelligent Medical Triage and Explainable Clinical Decision Support
 
 **Body:**
-- VIT Final Year Project — FF No. 180
-- Group 4 | AY 2026-27 | Semester 5
-- Guide: Dr. Bhagwan D. Thorat
+- **Department:** Artificial Intelligence and Data Science (AIDS), VIT Pune
+- **Coursework:** VIT Project Registration & Progress Review — FF No. 180 | Review 1
+- **Group No.:** 4 | AY 2026-27 | Semester 5
+- **Internal Guide:** Dr. Bhagwan D. Thorat
+- **Team Members (Presentation Order):**
+  1. **Nieehaanshu Hireh** (Roll No. 57, GR 12414454) — *Project Lead, Introduction & RAG Retrieval*
+  2. Krissh Garsund (Roll No. 38, GR 12413482) — *Multi-Agent Architecture & Interviewer Agent*
+  3. Harsh Gawas (Roll No. 41, GR 12410543) — *Medical Image Processing & Grad-CAM XAI*
+  4. Faheem Inamdar (Roll No. 58, GR 12414058) — *Document OCR & Clinical Lab NER*
+  5. Aarya Dangre (Roll No. 70, GR 12415175) — *4-Pillar Calibration & Cloud Architecture*
 
 **Visual:** Hero image — stethoscope + neural network mesh on dark background
 
-**Speaker notes:** *"Good morning/afternoon. We are Group 4 presenting MediAgent AI, our mid-semester progress on a multi-agent AI system designed to augment clinical decision-making."*
+**Speaker notes (Nieehaanshu Hireh):** *"Good morning respected Guide Dr. Bhagwan D. Thorat and distinguished members of the review panel. I am Nieehaanshu Hireh, presenting on behalf of Group 4 from the Department of Artificial Intelligence and Data Science. Today, we are presenting our mid-semester review for MediAgent AI — an intelligent, multi-agent clinical decision support system that integrates medical imaging, lab reports, guideline retrieval, and calibrated clinical confidence scoring. I will introduce the clinical motivation, problem statement, and our evidence retrieval pipeline, followed by my team members demonstrating each specialized agent."*
 
 ---
 

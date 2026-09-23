@@ -427,24 +427,6 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
           });
           return applyPillarCalibration(cond, pillars);
         });
-
-        // M5 calibrated confidence for the primary condition (index 0). The
-        // urgency cross-check is surfaced on the synthesis for an upstream
-        // WARNING on disagreement; it never silently mutates the triage level.
-        const m5 = await applyM5Calibration({
-          condition: parsed.probableConditions[0],
-          interviewer,
-          radiologist,
-          labAnalyst,
-          retrievedGuidelines,
-          dataCompletenessLevel,
-        });
-        parsed.probableConditions[0] = m5.condition;
-        if (m5.urgencyCrossCheck && m5.urgencyCrossCheck !== parsed.urgencyLevel) {
-          parsed.guidelineGroundingSummary =
-            `${parsed.guidelineGroundingSummary || ''} ` +
-            `[M5 urgency cross-check predicts '${m5.urgencyCrossCheck}', which differs from the assigned '${parsed.urgencyLevel}' — flagged for clinician review.]`;
-        }
       }
 
       return parsed;
@@ -453,7 +435,7 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
     }
   }
 
-  const fallback = buildFallbackDoctorSynthesis(
+  return buildFallbackDoctorSynthesis(
     interviewer,
     radiologist,
     labAnalyst,
@@ -465,26 +447,6 @@ Synthesize these inputs now. If imaging or labs are missing/deferred, explicitly
     defaultMissingSources,
     defaultLimitationsNotice
   );
-
-  // M5 calibrated confidence for the primary condition on the deterministic path.
-  if (fallback.probableConditions && fallback.probableConditions.length > 0) {
-    const m5 = await applyM5Calibration({
-      condition: fallback.probableConditions[0],
-      interviewer,
-      radiologist,
-      labAnalyst,
-      retrievedGuidelines,
-      dataCompletenessLevel,
-    });
-    fallback.probableConditions[0] = m5.condition;
-    if (m5.urgencyCrossCheck && m5.urgencyCrossCheck !== fallback.urgencyLevel) {
-      fallback.guidelineGroundingSummary =
-        `${fallback.guidelineGroundingSummary || ''} ` +
-        `[M5 urgency cross-check predicts '${m5.urgencyCrossCheck}', which differs from the assigned '${fallback.urgencyLevel}' — flagged for clinician review.]`;
-    }
-  }
-
-  return fallback;
 }
 
 function buildFallbackDoctorSynthesis(

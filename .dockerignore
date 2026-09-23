@@ -1,0 +1,43 @@
+# Dependencies & build outputs
+node_modules/
+dist/
+server-dist/
+coverage/
+
+# Local model cache (re-downloaded at runtime by the Node service)
+.model_cache/
+
+# Secrets & local env
+.env*
+!.env.example
+firebase-applet-config.json
+
+# Heavy training data & weights (mounted via compose volumes, not baked in)
+training/data/raw/
+training/data/processed/
+training/data/nih/
+training/data/chexpert/
+training/data/mimic/
+training/data/images/
+training/out/
+training/runs/
+training/checkpoints/
+training/**/*.csv
+training/**/*.jsonl
+training/**/*.bin
+training/**/*.npy
+training/**/*.npz
+
+# Python caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# VCS & scratch
+.git/
+tmp/
+scratch/
+*.log
+scripts/*.txt
+scripts/smoke-*.json
