@@ -1,9 +1,17 @@
 # MediAgent AI — Complete End-to-End System Documentation
 
-**Project Title:** MediAgent AI — Multi-Agent Clinical Decision Support System  
-**Academic Record:** VIT Third Year Project — FF No. 180 | Group 4 | AY 2026–27 | Semester 5  
-**Faculty Guide:** Dr. Bhagwan D. Thorat | Department of Computer Science & Engineering, VIT Pune  
+**Project Title (FF No. 180):** MediAgent AI: A Multi-Agent Retrieval-Augmented Generation (RAG) System for Intelligent Medical Triage and Explainable Clinical Decision Support  
+**Department:** Artificial Intelligence and Data Science (AIDS), Vishwakarma Institute of Technology, Pune  
+**Academic Record:** VIT Project Registration & Progress Review — FF No. 180 | Group 4 | AY 2026–27 | Semester 5  
+**Faculty Guide:** Dr. Bhagwan D. Thorat (Contact: 9881290300, bhagwan.thorat@vit.edu)  
 **Status:** Mid-Semester Review Ready (100% Implemented & Empirically Verified)
+
+### Team Members (Presentation Order):
+1. **Nieehaanshu Hireh** (Roll No. 57, G.R. 12414454) — *Project Lead, Problem Scope & RAG Knowledge Retrieval (M2)*
+2. **Krissh Garsund** (Roll No. 38, G.R. 12413482) — *Multi-Agent Architecture & Interviewer Agent (M4)*
+3. **Harsh Gawas** (Roll No. 41, G.R. 12410543) — *Medical Image Processing, DenseNet-121 ONNX & Grad-CAM XAI (M1)*
+4. **Faheem Inamdar** (Roll No. 58, G.R. 12414058) — *Document OCR & Clinical Lab Named Entity Recognition (M3)*
+5. **Aarya Dangre** (Roll No. 70, G.R. 12415175) — *Confidence Calibration (M5), Microservices & Cloud Architecture*
 
 ---
 
